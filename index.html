@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日照費用速算</title>
+  <style>
+    :root {
+      --primary: #1976d2;
+      --surface: #ffffff;
+      --background: #f4f6f9;
+      --text: #333333;
+      --border: #e0e0e0;
+      --accent: #2e7d32;
+    }
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      background-color: var(--background);
+      color: var(--text);
+    }
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+    h2 {
+      font-size: 1.15rem;
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: var(--primary);
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background-color: #fff;
+    }
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+    .checkbox-item input {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+    }
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.95rem;
+    }
+    .result-row:last-child {
+      border-bottom: none;
+    }
+    .total-highlight {
+      margin-top: 4px;
+      padding-top: 12px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #d32f2f;
+    }
+    .over-quota {
+      color: #d32f2f;
+      font-size: 0.85rem;
+      margin-top: 8px;
+      background: #ffebee;
+      padding: 8px;
+      border-radius: 6px;
+    }
+    .badge-card {
+      background: #e8f5e9;
+      border: 1px solid #c8e6c9;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .badge-card h3 {
+      margin: 0 0 8px 0;
+      font-size: 0.95rem;
+      color: var(--accent);
+    }
+    .limit-item {
+      font-size: 0.88rem;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .limit-category {
+      font-weight: bold;
+      color: #1b5e20;
+      margin-top: 6px;
+      margin-bottom: 2px;
+      font-size: 0.88rem;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .btn-auto {
+      flex: 1;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 9px 6px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-auto.btn-secondary {
+      background-color: #0288d1;
+    }
+    .btn-auto:active {
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>個案基本設定</h2>
+    
+    <div class="form-group">
+      <label for="cmsLevel">長照失能等級</label>
+      <select id="cmsLevel" onchange="onLevelChange()">
+        <option value="2">第 2 級（補助上限 $10,020）</option>
+        <option value="3">第 3 級（補助上限 $15,460）</option>
+        <option value="4" selected>第 4 級（補助上限 $18,580）</option>
+        <option value="5">第 5 級（補助上限 $24,100）</option>
+        <option value="6">第 6 級（補助上限 $28,070）</option>
+        <option value="7">第 7 級（補助上限 $32,090）</option>
+        <option value="8">第 8 級（補助上限 $36,180）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="identity">福利身分別（自負比例）</label>
+      <select id="identity" onchange="calculate()">
+        <option value="0.16">一般戶（自負 16%）</option>
+        <option value="0.05">中低收入戶（自負 5%）</option>
+        <option value="0">低收入戶（自負 0%）</option>
+      </select>
+    </div>
+
+    <!-- 該等級補助上限速查 -->
+    <div class="badge-card">
+      <h3 id="limitTitle">該等級額度上限速查</h3>
+      
+      <div class="limit-category">【全日上限】</div>
+      <div class="limit-item">
+        <span>純全日：</span>
+        <strong id="limitPureFull">0 天</strong>
+      </div>
+      <div class="limit-item">
+        <span>全日 + 車：</span>
+        <strong id="limitWithTransFull">0 天</strong>
+      </div>
+
+      <div class="limit-category">【半日上限】</div>
+      <div class="limit-item">
+        <span>純半日：</span>
+        <strong id="limitPureHalf">0 天</strong>
+      </div>
+      <div class="limit-item">
+        <span>半日 + 車：</span>
+        <strong id="limitWithTransHalf">0 天</strong>
+      </div>
+      <div class="limit-item">
+        <span>半日 + 車 + 週洗1次(4次)：</span>
+        <strong id="limitWithTransBathHalf">0 天</strong>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn-auto" onclick="applyMax('full')">帶入全日最高</button>
+        <button type="button" class="btn-auto btn-secondary" onclick="applyMax('half')">帶入半日最高</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>日照使用規劃（每月）</h2>
+    
+    <div class="form-group">
+      <label for="fullDays">全日服務天數</label>
+      <input type="number" id="fullDays" min="0" value="16" oninput="calculate()">
+    </div>
+
+    <div class="form-group">
+      <label for="halfDays">半日服務天數</label>
+      <input type="number" id="halfDays" min="0" value="0" oninput="calculate()">
+    </div>
+
+    <div class="form-group">
+      <label>加值選配項目</label>
+      <div class="checkbox-group">
+        <label class="checkbox-item">
+          <input type="checkbox" id="transportIncluded" checked onchange="calculate()">
+          包含日照交通接送（每次 $115，每日來回 2 趟計 $230）
+        </label>
+        <label class="checkbox-item">
+          <input type="checkbox" id="bathIncluded" onchange="toggleBathCount()">
+          包含日照沐浴服務（每次 $200）
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group" id="bathCountContainer" style="display: none;">
+      <label for="bathTimes">每月沐浴次數</label>
+      <input type="number" id="bathTimes" min="0" value="4" oninput="calculate()">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>費用試算明細</h2>
+    
+    <div class="result-row">
+      <span>補助額度：</span>
+      <span id="quotaDisplay" style="font-weight: 600;">$0</span>
+    </div>
+    <div class="result-row">
+      <span>額度內自負額：</span>
+      <span id="copayDisplay" style="font-weight: 600;">$0</span>
+    </div>
+    <div class="result-row">
+      <span>超額自付金額：</span>
+      <span id="excessDisplay" style="font-weight: 600;">$0</span>
+    </div>
+    <div class="result-row total-highlight">
+      <span>民眾應繳總額：</span>
+      <span id="finalSelfPayDisplay">$0</span>
+    </div>
+    <div id="excessWarning" class="over-quota" style="display: none;">
+      ⚠️ 提醒：已超出補助額度，超額部分需全額自付。
+    </div>
+  </div>
+
+  <script>
+    var CMS_CONFIG = {
+      2: { quota: 10020, full: 675, half: 340 },
+      3: { quota: 15460, full: 840, half: 420 },
+      4: { quota: 18580, full: 920, half: 460 },
+      5: { quota: 24100, full: 1045, half: 525 },
+      6: { quota: 28070, full: 1145, half: 575 },
+      7: { quota: 32090, full: 1245, half: 625 },
+      8: { quota: 36180, full: 1305, half: 655 }
+    };
+
+    var TRANSPORT_TRIP_PRICE = 115;
+    var TRANSPORT_DAY_PRICE = 230; // 115 * 2
+    var BATH_PRICE = 200;
+
+    function onLevelChange() {
+      updateLimitCard();
+      calculate();
+    }
+
+    function updateLimitCard() {
+      var level = document.getElementById('cmsLevel').value;
+      var data = CMS_CONFIG[level];
+      
+      var maxPureFull = Math.floor(data.quota / data.full);
+      var maxWithTransFull = Math.floor(data.quota / (data.full + TRANSPORT_DAY_PRICE));
+      
+      var maxPureHalf = Math.floor(data.quota / data.half);
+      var maxWithTransHalf = Math.floor(data.quota / (data.half + TRANSPORT_DAY_PRICE));
+      var maxWithTransBathHalf = Math.floor((data.quota - (4 * BATH_PRICE)) / (data.half + TRANSPORT_DAY_PRICE));
+
+      document.getElementById('limitTitle').innerText = '第 ' + level + ' 級額度上限速查 ($' + data.quota.toLocaleString() + ')';
+      document.getElementById('limitPureFull').innerText = maxPureFull + ' 天 ($' + (maxPureFull * data.full).toLocaleString() + ')';
+      document.getElementById('limitWithTransFull').innerText = maxWithTransFull + ' 天 ($' + (maxWithTransFull * (data.full + TRANSPORT_DAY_PRICE)).toLocaleString() + ')';
+      
+      document.getElementById('limitPureHalf').innerText = maxPureHalf + ' 天 ($' + (maxPureHalf * data.half).toLocaleString() + ')';
+      document.getElementById('limitWithTransHalf').innerText = maxWithTransHalf + ' 天 ($' + (maxWithTransHalf * (data.half + TRANSPORT_DAY_PRICE)).toLocaleString() + ')';
+      document.getElementById('limitWithTransBathHalf').innerText = maxWithTransBathHalf + ' 天 ($' + (maxWithTransBathHalf * (data.half + TRANSPORT_DAY_PRICE) + 800).toLocaleString() + ')';
+    }
+
+    function applyMax(type) {
+      var level = document.getElementById('cmsLevel').value;
+      var data = CMS_CONFIG[level];
+      var transportIncluded = document.getElementById('transportIncluded').checked;
+      var bathIncluded = document.getElementById('bathIncluded').checked;
+      var bathTimes = bathIncluded ? Math.max(0, parseInt(document.getElementById('bathTimes').value) || 0) : 0;
+
+      var bathTotal = bathTimes * BATH_PRICE;
+      var availableQuota = data.quota - bathTotal;
+      var unitPrice = (type === 'full') ? data.full : data.half;
+      var dayCost = unitPrice + (transportIncluded ? TRANSPORT_DAY_PRICE : 0);
+
+      if (availableQuota > 0 && dayCost > 0) {
+        var optimalDays = Math.floor(availableQuota / dayCost);
+        if (type === 'full') {
+          document.getElementById('fullDays').value = optimalDays;
+          document.getElementById('halfDays').value = 0;
+        } else {
+          document.getElementById('halfDays').value = optimalDays;
+          document.getElementById('fullDays').value = 0;
+        }
+        calculate();
+      }
+    }
+
+    function toggleBathCount() {
+      var isChecked = document.getElementById('bathIncluded').checked;
+      document.getElementById('bathCountContainer').style.display = isChecked ? 'block' : 'none';
+      calculate();
+    }
+
+    function calculate() {
+      var level = document.getElementById('cmsLevel').value;
+      var copayRate = parseFloat(document.getElementById('identity').value);
+      var fullDays = Math.max(0, parseInt(document.getElementById('fullDays').value) || 0);
+      var halfDays = Math.max(0, parseInt(document.getElementById('halfDays').value) || 0);
+      var transportIncluded = document.getElementById('transportIncluded').checked;
+      var bathIncluded = document.getElementById('bathIncluded').checked;
+      var bathTimes = bathIncluded ? Math.max(0, parseInt(document.getElementById('bathTimes').value) || 0) : 0;
+
+      var levelData = CMS_CONFIG[level];
+      var quota = levelData.quota;
+
+      var daycareCost = (fullDays * levelData.full) + (halfDays * levelData.half);
+      var totalDays = fullDays + halfDays;
+      var transportCost = transportIncluded ? (totalDays * TRANSPORT_DAY_PRICE) : 0;
+      var bathCost = bathTimes * BATH_PRICE;
+
+      var totalCost = daycareCost + transportCost + bathCost;
+      var withinQuota = Math.min(totalCost, quota);
+      var excess = Math.max(0, totalCost - quota);
+
+      var copay = Math.round(withinQuota * copayRate);
+      var finalSelfPay = copay + excess;
+
+      document.getElementById('quotaDisplay').innerText = '$' + quota.toLocaleString();
+      document.getElementById('copayDisplay').innerText = '$' + copay.toLocaleString();
+      document.getElementById('excessDisplay').innerText = '$' + excess.toLocaleString();
+      document.getElementById('finalSelfPayDisplay').innerText = '$' + finalSelfPay.toLocaleString();
+
+      document.getElementById('excessWarning').style.display = excess > 0 ? 'block' : 'none';
+    }
+
+    window.onload = function() {
+      updateLimitCard();
+      calculate();
+    };
+  </script>
+</body>
+</html>
